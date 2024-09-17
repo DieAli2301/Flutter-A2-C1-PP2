@@ -155,6 +155,24 @@ class OtherScreen extends StatelessWidget {
     }
   }
 
+  // Método para hacer una llamada
+  Future<void> _makePhoneCall() async {
+    const telUrl = 'tel:+529181071656'; // Reemplaza con el número que desees marcar
+    final Uri telUri = Uri.parse(telUrl);
+    if (!await launchUrl(telUri, mode: LaunchMode.externalApplication)) {
+      throw 'No se pudo iniciar la llamada: $telUrl';
+    }
+  }
+
+  // Método para enviar un mensaje de texto
+  Future<void> _sendMessage() async {
+    const smsUrl = 'sms:+529181071656'; // Reemplaza con el número al que quieras enviar el mensaje
+    final Uri smsUri = Uri.parse(smsUrl);
+    if (!await launchUrl(smsUri, mode: LaunchMode.externalApplication)) {
+      throw 'No se pudo enviar el mensaje: $smsUrl';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -188,6 +206,16 @@ class OtherScreen extends StatelessWidget {
             ElevatedButton(
               onPressed: _launchGitHubUrl,
               child: const Text('Enlace a GitHub'),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _makePhoneCall,
+              child: const Text('Llamar al número'),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _sendMessage,
+              child: const Text('Mandar mensaje'),
             ),
           ],
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart'; // Asegúrate de que este archivo tenga la clase HomeScreen
 import 'screens/student_form.dart'; // Asegúrate de que este archivo tenga la clase StudentForm
 import 'screens/student_list.dart'; // Asegúrate de que este archivo tenga la clase StudentList
+import 'screens/chat_screen.dart'; // Asegúrate de que este archivo tenga la clase OtherScreen
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -23,6 +24,8 @@ class MyApp extends StatelessWidget {
         '/student_list': (context) =>  StudentList(),
         '/other': (context) => const OtherScreen(),
         '/input_text': (context) => const InputAndTextScreen(),
+        '/chat_screen': (context) => const ChatbotPage(),
+        
       },
     );
   }
@@ -43,6 +46,7 @@ class _MainScreenState extends State<MainScreen> {
     StudentForm(), // Página de StudentForm
     const OtherScreen(), // Otra página
     const InputAndTextScreen(), // Página de Entrada de Texto
+    const ChatbotPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -113,6 +117,16 @@ class _MainScreenState extends State<MainScreen> {
                 });
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.adb),
+              title: const Text('Chatbot'),
+              onTap: () {
+                Navigator.pop(context); // Cierra el drawer
+                setState(() {
+                  _selectedIndex = 4; // Navega a chatbot Página
+                });
+              },
+            ),
           ],
         ),
       ),
@@ -134,6 +148,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.text_fields),
             label: 'Entrada de Texto',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.text_fields),
+            label: 'Chatbot',
           ),
         ],
         currentIndex: _selectedIndex,

@@ -1,9 +1,10 @@
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'dart:async'; 
+import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -29,24 +30,25 @@ class ChatbotPage extends StatefulWidget {
 }
 
 class _ChatbotPageState extends State<ChatbotPage> {
-  final String apiKey = 'AIzaSyCmj_VCtdn5rSAK3X3Pp_Ic9rfBA2VCwAY'; // Tu API Key!!
   final String apiUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyCmj_VCtdn5rSAK3X3Pp_Ic9rfBA2VCwAY'; // Aquí usa tu API Key!!
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyCmj_VCtdn5rSAK3X3Pp_Ic9rfBA2VCwAY'; // API KEY
 
   final TextEditingController _controller = TextEditingController();
   final List<Map<String, String>> _messages = [];
-  final List<Map<String, String>> _history = []; 
-  bool _isConnected = true;
-
- 
+  final FocusNode _focusNode = FocusNode();
   late StreamSubscription<ConnectivityResult> _connectivitySubscription;
+
+  bool _isConnected = true;
+  bool _isThinking = false;
+  final List<String> _emojis = ['👾', '🎃', '🦾', '😀', '👻'];
 
   @override
   void initState() {
     super.initState();
-    _checkConnection(); 
+    _checkConnection();
+    _loadMessages();  // Cargar mensajes guardados
     _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
+        Connectivity().onConnectivityChanged.listen((result) {
       setState(() {
         _isConnected = result != ConnectivityResult.none;
       });
@@ -55,72 +57,140 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
   @override
   void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
     _connectivitySubscription.cancel();
     super.dispose();
   }
 
- 
   Future<void> _checkConnection() async {
-    final ConnectivityResult result = await Connectivity().checkConnectivity();
+    final result = await Connectivity().checkConnectivity();
     setState(() {
       _isConnected = result != ConnectivityResult.none;
     });
   }
 
-  Future<void> sendMessage(String message) async {
+  String _getRandomEmoji() {
+    final random = Random();
+    return _emojis[random.nextInt(_emojis.length)];
+  }
+
+  Future<void> _saveMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String encodedMessages = json.encode(_messages);
+    prefs.setString('messages', encodedMessages);
+  }
+
+  Future<void> _loadMessages() async {
+  final prefs = await SharedPreferences.getInstance();
+  final String? encodedMessages = prefs.getString('messages');
+  
+  if (encodedMessages != null) {
+    final List<dynamic> decodedMessages = json.decode(encodedMessages);
+    
     setState(() {
-      _messages.add({"sender": "user", "message": message});
-      _history.add({"sender": "user", "message": message}); 
+      _messages.clear();
+      _messages.addAll(
+        decodedMessages.map((message) {
+          return {
+            'sender': message['sender'].toString(),
+            'message': message['message'].toString(),
+          };
+        }).toList(),
+      );
     });
+  }
+}
 
-    final response = await http.post(
-      Uri.parse(apiUrl),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: json.encode({
-        "contents": [
-          {
-            "parts": [
-              {"text": message} 
-            ]
-          }
-        ]
-      }),
-    );
 
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}'); 
+  Future<void> sendMessage(String message) async {
+  setState(() {
+    _messages.add({"sender": "user", "message": message});
+    _isThinking = true;
+    _controller.clear();
+  });
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final botMessage = data["candidates"]?[0]["content"]?["parts"]?[0]["text"] ?? 'No response';
+  Future.microtask(() async {
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          "contents": [
+            {
+              "parts": [
+                {"text": message}
+              ]
+            }
+          ]
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final botMessage = data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.toString() ?? 'No response'; // Asegurarse de que el valor sea String
+        final botMessageWithEmoji = '$botMessage ${_getRandomEmoji()}';
+
+        setState(() {
+          _messages.add({"sender": "bot", "message": botMessageWithEmoji});
+        });
+      } else {
+        setState(() {
+          _messages.add({
+            "sender": "bot",
+            "message": "Error: ${response.statusCode} - ${response.body}"
+          });
+        });
+      }
+    } catch (e) {
       setState(() {
-        _messages.add({"sender": "bot", "message": botMessage}); 
-        _history.add({"sender": "bot", "message": botMessage}); 
+        _messages.add({"sender": "bot", "message": "Error: $e"});
       });
-    } else {
+    } finally {
       setState(() {
-        _messages.add({
-          "sender": "bot",
-          "message": "Error: ${response.statusCode}"
-        }); 
+        _isThinking = false;
       });
     }
+  });
+}
 
-    _controller.clear(); 
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chatbot Mejorado'),
+        backgroundColor: Colors.deepPurple,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: () {
+              setState(() {
+                _messages.clear();
+                _saveMessages();  // Limpiar mensajes guardados
+              });
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(10.0),
-              itemCount: _messages.length,
+              itemCount: _messages.length + (_isThinking ? 1 : 0),
               itemBuilder: (context, index) {
+                if (_isThinking && index == _messages.length) {
+                  return const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.all(10.0),
+                      child: Text('Bot escribiendo',
+                          style: TextStyle(fontStyle: FontStyle.italic)),
+                    ),
+                  );
+                }
+
                 final message = _messages[index];
                 final isUserMessage = message['sender'] == 'user';
 
@@ -133,14 +203,20 @@ class _ChatbotPageState extends State<ChatbotPage> {
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
                       color: isUserMessage
-                          ? Colors.blueAccent
-                          : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(15.0),
+                          ? Colors.deepPurple[300]
+                          : Color.fromARGB(255, 250, 161, 244),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(isUserMessage ? 15 : 0),
+                        topRight: const Radius.circular(15),
+                        bottomLeft: const Radius.circular(15),
+                        bottomRight: Radius.circular(isUserMessage ? 0 : 15),
+                      ),
                     ),
                     child: Text(
                       message['message']!,
                       style: TextStyle(
                         color: isUserMessage ? Colors.white : Colors.black,
+                        fontSize: 16.0,
                       ),
                     ),
                   ),
@@ -149,30 +225,32 @@ class _ChatbotPageState extends State<ChatbotPage> {
             ),
           ),
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: 'Escribe un mensaje...',
-                      border: OutlineInputBorder(),
+                    focusNode: _focusNode,
+                    decoration: InputDecoration(
+                      hintText: 'Escribir mensaje',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15.0),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8.0),
                 IconButton(
                   icon: const Icon(Icons.send),
-                  color: _isConnected ? Colors.blueAccent : Colors.grey,
+                  color: _isConnected ? Colors.deepPurpleAccent : Colors.grey,
                   onPressed: _isConnected
                       ? () {
-                          if (_controller.text.isNotEmpty) {
-                            sendMessage(_controller.text);
+                          if (_controller.text.trim().isNotEmpty) {
+                            sendMessage(_controller.text.trim());
                           }
                         }
-                      : null, 
+                      : null,
                 ),
               ],
             ),

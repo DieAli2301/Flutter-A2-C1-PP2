@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Aplicación',
-      initialRoute: '/',
+      initialRoute: '/other',
       routes: {
         '/': (context) => const MainScreen(),
         '/home': (context) => HomeScreen(),
@@ -78,8 +78,8 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.home),
-              title: const Text('HomeScreen'),
+              leading: const Icon(Icons.info),
+              title: const Text('Información'),
               onTap: () {
                 Navigator.pop(context); // Cierra el drawer
                 setState(() {
@@ -98,8 +98,8 @@ class _MainScreenState extends State<MainScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.info),
-              title: const Text('Otros'),
+              leading: const Icon(Icons.home),
+              title: const Text('HomeScreen'),
               onTap: () {
                 Navigator.pop(context); // Cierra el drawer
                 setState(() {
@@ -134,7 +134,7 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+            icon: Icon(Icons.info),
             label: 'HomeScreen',
           ),
           BottomNavigationBarItem(
@@ -142,7 +142,7 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Student Form',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.info),
+            icon: Icon(Icons.home),
             label: 'Otros',
           ),
           BottomNavigationBarItem(
@@ -195,7 +195,7 @@ class OtherScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Other Screen'),
+        title: const Text('Home Screen'),
       ),
       body: Center(
         child: Column(

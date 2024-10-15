@@ -41,6 +41,9 @@ class _ChatbotPageState extends State<ChatbotPage> {
   bool _isConnected = true;
   bool _isThinking = false;
   final List<String> _emojis = ['👾', '🎃', '🦾', '😀', '👻'];
+   bool _isMessageValid(String message) {
+    return message.trim().isNotEmpty;
+  }
 
   @override
   void initState() {
@@ -243,11 +246,12 @@ class _ChatbotPageState extends State<ChatbotPage> {
                 const SizedBox(width: 8.0),
                 IconButton(
                   icon: const Icon(Icons.send),
-                  color: _isConnected ? Colors.deepPurpleAccent : Colors.grey,
+                  color: _isConnected ? Colors.greenAccent : Colors.grey,
                   onPressed: _isConnected
                       ? () {
-                          if (_controller.text.trim().isNotEmpty) {
-                            sendMessage(_controller.text.trim());
+                          final text = _controller.text;
+                          if (_isMessageValid(text)) {
+                            sendMessage(text.trim());
                           }
                         }
                       : null,

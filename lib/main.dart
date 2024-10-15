@@ -220,6 +220,11 @@ class OtherScreen extends StatelessWidget {
               'Matrícula: 221277',
               style: TextStyle(fontSize: 16),
             ),
+            const SizedBox(height: 10),
+            const Text(
+              'Grado y Grupo: 9B',
+              style: TextStyle(fontSize: 16),
+            ),
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: _launchGitHubUrl,

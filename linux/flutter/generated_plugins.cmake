@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  torch_flashlight
   url_launcher_linux
 )
 

@@ -3,6 +3,11 @@ import 'screens/home_screen.dart'; // Asegúrate de que este archivo tenga la cl
 import 'screens/student_form.dart'; // Asegúrate de que este archivo tenga la clase StudentForm
 import 'screens/student_list.dart'; // Asegúrate de que este archivo tenga la clase StudentList
 import 'screens/chat_screen.dart'; // Asegúrate de que este archivo tenga la clase OtherScreen
+import 'screens/geolocator_screen.dart';
+import 'screens/codigoqr_screen.dart';
+import 'screens/flash_sensor_screen.dart';
+import 'screens/text_spech.dart';
+import 'screens/text_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -25,6 +30,11 @@ class MyApp extends StatelessWidget {
         '/other': (context) => const OtherScreen(),
         '/input_text': (context) => const InputAndTextScreen(),
         '/chat_screen': (context) => const ChatbotPage(),
+        '/geo_locator': (context) => const GeoLocatorScreen(),
+        '/qrscanner': (context) => const QRScannerScreen(),
+        '/flash_sensor': (context) => const SensorScreen(),
+        '/text_speech': (context) => const TextToSpeechScreen(),
+        '/text_to_text': (context) => const SpeechToTextScreen(),
         
       },
     );
@@ -47,6 +57,11 @@ class _MainScreenState extends State<MainScreen> {
     const OtherScreen(), // Otra página
     const InputAndTextScreen(), // Página de Entrada de Texto
     const ChatbotPage(),
+    const GeoLocatorScreen(),
+    const QRScannerScreen(),
+    const SensorScreen(),
+    const TextToSpeechScreen(),
+    const SpeechToTextScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -127,6 +142,44 @@ class _MainScreenState extends State<MainScreen> {
                 });
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.location_on),
+              title: const Text('Geolocator'),
+              onTap: () {
+                Navigator.pop(context); // Cierra el drawer
+                setState(() {
+                  _selectedIndex = 5; // Navega a chatbot Página
+                });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.qr_code),
+              title: const Text('Escáner QR'),
+              onTap: () {
+                Navigator.pushNamed(context, '/qrscanner');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.flash_on),
+              title: const Text('Sensor de Luz'),
+              onTap: () {
+                Navigator.pushNamed(context, '/flash_sensor');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.speaker_notes),
+              title: const Text('Text to Speech'),
+              onTap: () {
+                Navigator.pushNamed(context, '/text_speech');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.mic),
+              title: const Text('Speech to Text'),
+              onTap: () {
+                Navigator.pushNamed(context, '/text_to_text');
+              },
+            ),
           ],
         ),
       ),
@@ -152,6 +205,26 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.text_fields),
             label: 'Chatbot',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.location_on),
+            label: 'Geolocator',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.qr_code),
+            label: 'Escáner QR',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.flash_on),
+            label: 'Sensor de Luz',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.speaker_notes),
+            label: 'Text to Speech',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.mic),
+            label: 'Speech to Text',
           ),
         ],
         currentIndex: _selectedIndex,

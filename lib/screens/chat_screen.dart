@@ -78,15 +78,15 @@ class _ChatbotPageState extends State<ChatbotPage> {
     return _emojis[random.nextInt(_emojis.length)];
   }
 
-  Future<void> _saveMessages() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encodedMessages = json.encode(_messages);
-    prefs.setString('messages', encodedMessages);
+  Future<void> _saveMessages() async { // Guardar mensajes
+    final prefs = await SharedPreferences.getInstance(); // Crear instancia de SharedPreferences
+    final String encodedMessages = json.encode(_messages);// Codificar los mensajes
+    prefs.setString('messages', encodedMessages);// Guardar los mensajes
   }
 
-  Future<void> _loadMessages() async {
-  final prefs = await SharedPreferences.getInstance();
-  final String? encodedMessages = prefs.getString('messages');
+  Future<void> _loadMessages() async { // Cargar mensajes
+  final prefs = await SharedPreferences.getInstance(); 
+  final String? encodedMessages = prefs.getString('messages'); 
   
   if (encodedMessages != null) {
     final List<dynamic> decodedMessages = json.decode(encodedMessages);
@@ -94,7 +94,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
     setState(() {
       _messages.clear();
       _messages.addAll(
-        decodedMessages.map((message) {
+        decodedMessages.map((message) { 
           return {
             'sender': message['sender'].toString(),
             'message': message['message'].toString(),
@@ -106,11 +106,12 @@ class _ChatbotPageState extends State<ChatbotPage> {
 }
 
 
-  Future<void> sendMessage(String message) async {
+Future<void> sendMessage(String message) async { 
   setState(() {
     _messages.add({"sender": "user", "message": message});
     _isThinking = true;
     _controller.clear();
+    _saveMessages();  // Guardar mensajes inmediatamente después de agregar el mensaje del usuario
   });
 
   Future.microtask(() async {
@@ -131,11 +132,12 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final botMessage = data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.toString() ?? 'No response'; // Asegurarse de que el valor sea String
+        final botMessage = data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.toString() ?? 'No response';
         final botMessageWithEmoji = '$botMessage ${_getRandomEmoji()}';
 
         setState(() {
           _messages.add({"sender": "bot", "message": botMessageWithEmoji});
+          _saveMessages();  // Guardar los mensajes inmediatamente después de recibir la respuesta del bot
         });
       } else {
         setState(() {
@@ -143,11 +145,13 @@ class _ChatbotPageState extends State<ChatbotPage> {
             "sender": "bot",
             "message": "Error: ${response.statusCode} - ${response.body}"
           });
+          _saveMessages();  // Guardar los mensajes si hay un error
         });
       }
     } catch (e) {
       setState(() {
         _messages.add({"sender": "bot", "message": "Error: $e"});
+        _saveMessages();  // Guardar los mensajes si hay una excepción
       });
     } finally {
       setState(() {
@@ -156,6 +160,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
     }
   });
 }
+
 
 
   @override

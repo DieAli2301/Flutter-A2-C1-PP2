@@ -58,20 +58,23 @@ class _SensorScreenState extends State<SensorScreen> {
 
   // Encender o apagar la linterna
   Future<void> _toggleFlash() async {
-    if (!_isTorchAvailable) {
+  if (!_isTorchAvailable) {
       print("Linterna no disponible en este dispositivo.");
       return;
     }
 
     try {
       if (_isFlashOn) {
-        await TorchFlashlight.disableTorchFlashlight();  // Método correcto para apagar la linterna.
+        print("Intentando apagar la linterna");
+        await TorchFlashlight.disableTorchFlashlight();
       } else {
-        await TorchFlashlight.enableTorchFlashlight();   // Método correcto para encender la linterna.
+        print("Intentando encender la linterna");
+        await TorchFlashlight.enableTorchFlashlight();
       }
       setState(() {
         _isFlashOn = !_isFlashOn;
       });
+      print("Estado de la linterna: $_isFlashOn");
     } catch (e) {
       print("Error al controlar la linterna: $e");
     }

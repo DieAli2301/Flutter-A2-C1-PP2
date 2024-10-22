@@ -11,14 +11,19 @@ class GeoLocatorScreen extends StatefulWidget {
 
 class _GeoLocatorScreenState extends State<GeoLocatorScreen> {
   String _locationMessage = "";
+  double? _latitude;  // Almacenar la latitud obtenida.
+  double? _longitude; // Almacenar la longitud obtenida.
 
   Future<void> _getCurrentLocation() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
+
       setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
         _locationMessage =
-            "Lat: ${position.latitude}, Long: ${position.longitude}";
+            "Lat: ${_latitude}, Long: ${_longitude}";
       });
     } catch (e) {
       setState(() {
@@ -28,38 +33,27 @@ class _GeoLocatorScreenState extends State<GeoLocatorScreen> {
   }
 
   Future<void> _openInMaps() async {
-    if (_locationMessage.isEmpty) {
+    if (_latitude == null || _longitude == null) {
       setState(() {
         _locationMessage = "No coordinates available to open in Maps.";
       });
       return;
     }
 
-    // Extraer las coordenadas del mensaje de ubicación
-    final parts = _locationMessage.split(", ");
-    if (parts.length < 2) {
-      setState(() {
-        _locationMessage = "Invalid location format.";
-      });
-      return;
-    }
+    // Construir la URL de Google Maps
+    final String googleMapsUrl =
+        "https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude";
+    final Uri uri = Uri.parse(googleMapsUrl);
 
-    final String latitude = parts[0].split(": ")[1]; // Obtener la latitud
-    final String longitude = parts[1].split(": ")[1]; // Obtener la longitud
-
-    // Construir la URL de OpenStreetMap
-    final String openStreetMapUrl =
-        "https://www.openstreetmap.org/?mlat=$latitude&mlon=$longitude#map=16/$latitude/$longitude";
-    final Uri uri = Uri.parse(openStreetMapUrl);
-
-    if (await canLaunchUrl(uri)) {
+    try {
+      // Intenta abrir la URL sin verificar `canLaunchUrl`
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+    } catch (e) {
       setState(() {
         _locationMessage =
             'Could not open the map. Ensure you have a web browser installed.';
       });
-      throw 'Could not open the map.';
+      print("Error opening URL: $e");
     }
   }
 
@@ -80,7 +74,7 @@ class _GeoLocatorScreenState extends State<GeoLocatorScreen> {
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: _openInMaps,
-              child: const Text("Ver en OpenStreetMap"),
+              child: const Text("Ver en Google Maps"),
             ),
           ],
         ),

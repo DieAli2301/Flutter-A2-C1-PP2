@@ -3,8 +3,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 void main() {
   runApp(const MyApp());
@@ -36,20 +38,36 @@ class _ChatbotPageState extends State<ChatbotPage> {
   final TextEditingController _controller = TextEditingController();
   final List<Map<String, String>> _messages = [];
   final FocusNode _focusNode = FocusNode();
-  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
+  final scrollController = ScrollController();
 
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      scrollController.animateTo(
+        scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
   bool _isConnected = true;
   bool _isThinking = false;
-  final List<String> _emojis = ['👾', '🎃', '🦾', '😀', '👻'];
-   bool _isMessageValid(String message) {
-    return message.trim().isNotEmpty;
-  }
+
+  // Speech-to-Text and Text-to-Speech
+  final FlutterTts _flutterTts = FlutterTts();
+  late stt.SpeechToText _speechToText;
+  bool _isListening = false;
 
   @override
   void initState() {
     super.initState();
     _checkConnection();
-    _loadMessages();  // Cargar mensajes guardados
+    _loadHistory();
+
+    _speechToText = stt.SpeechToText();
+    _initializeTts();
+
     _connectivitySubscription =
         Connectivity().onConnectivityChanged.listen((result) {
       setState(() {
@@ -58,12 +76,12 @@ class _ChatbotPageState extends State<ChatbotPage> {
     });
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focusNode.dispose();
-    _connectivitySubscription.cancel();
-    super.dispose();
+  Future<void> _initializeTts() async {
+    await _flutterTts.setLanguage("en-US");
+    await _flutterTts.setPitch(1.0);
+    await _flutterTts.setSpeechRate(0.5);
+    await _flutterTts.setVolume(1.0);
+    await _flutterTts.awaitSpeakCompletion(true);
   }
 
   Future<void> _checkConnection() async {
@@ -73,111 +91,135 @@ class _ChatbotPageState extends State<ChatbotPage> {
     });
   }
 
-  String _getRandomEmoji() {
-    final random = Random();
-    return _emojis[random.nextInt(_emojis.length)];
+  Future<void> _saveHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String encodedData = json.encode(_messages);
+    await prefs.setString('chat_history', encodedData);
   }
 
-  Future<void> _saveMessages() async { // Guardar mensajes
-    final prefs = await SharedPreferences.getInstance(); // Crear instancia de SharedPreferences
-    final String encodedMessages = json.encode(_messages);// Codificar los mensajes
-    prefs.setString('messages', encodedMessages);// Guardar los mensajes
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? encodedData = prefs.getString('chat_history');
+    if (encodedData != null) {
+      final List<dynamic> decodedData = json.decode(encodedData);
+      setState(() {
+        _messages.addAll(decodedData.map((e) => Map<String, String>.from(e)));
+      });
+    }
   }
 
-  Future<void> _loadMessages() async { // Cargar mensajes
-  final prefs = await SharedPreferences.getInstance(); 
-  final String? encodedMessages = prefs.getString('messages'); 
-  
-  if (encodedMessages != null) {
-    final List<dynamic> decodedMessages = json.decode(encodedMessages);
-    
+  Future<void> _clearChat() async {
     setState(() {
       _messages.clear();
-      _messages.addAll(
-        decodedMessages.map((message) { 
-          return {
-            'sender': message['sender'].toString(),
-            'message': message['message'].toString(),
-          };
-        }).toList(),
-      );
     });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('chat_history');
   }
-}
 
-
-Future<void> sendMessage(String message) async { 
+  Future<void> sendMessage(String message) async {
   setState(() {
     _messages.add({"sender": "user", "message": message});
     _isThinking = true;
     _controller.clear();
-    _saveMessages();  // Guardar mensajes inmediatamente después de agregar el mensaje del usuario
+    // Añadir mensaje temporal
+    _messages.add({"sender": "bot", "message": "bot escribiendo..."});
   });
 
-  Future.microtask(() async {
-    try {
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          "contents": [
-            {
-              "parts": [
-                {"text": message}
-              ]
-            }
-          ]
-        }),
-      );
+  try {
+    final conversationContext = _messages
+        .map((msg) => '${msg["sender"]}: ${msg["message"]}')
+        .join('\n');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final botMessage = data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.toString() ?? 'No response';
-        final botMessageWithEmoji = '$botMessage ${_getRandomEmoji()}';
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        "contents": [
+          {
+            "parts": [
+              {"text": "$conversationContext\nUser: $message"}
+            ]
+          }
+        ]
+      }),
+    );
 
-        setState(() {
-          _messages.add({"sender": "bot", "message": botMessageWithEmoji});
-          _saveMessages();  // Guardar los mensajes inmediatamente después de recibir la respuesta del bot
-        });
-      } else {
-        setState(() {
-          _messages.add({
-            "sender": "bot",
-            "message": "Error: ${response.statusCode} - ${response.body}"
-          });
-          _saveMessages();  // Guardar los mensajes si hay un error
-        });
-      }
-    } catch (e) {
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final botMessage = 
+        (data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"] ?? 'No response')
+          .replaceAll('*', ''); 
+
       setState(() {
-        _messages.add({"sender": "bot", "message": "Error: $e"});
-        _saveMessages();  // Guardar los mensajes si hay una excepción
+        // Reemplazar el mensaje temporal con la respuesta real
+        _messages.removeLast();
+        _messages.add({"sender": "bot", "message": botMessage});
       });
-    } finally {
+
+      await _flutterTts.speak(botMessage); 
+    } else {
       setState(() {
-        _isThinking = false;
+        // Reemplazar el mensaje temporal con un mensaje de error
+        _messages.removeLast();
+        _messages.add({
+          "sender": "bot",
+          "message": "Error: ${response.statusCode} - ${response.body}"
+        });
       });
     }
-  });
+  } catch (e) {
+    setState(() {
+      // Reemplazar el mensaje temporal con un mensaje de error
+      _messages.removeLast();
+      _messages.add({"sender": "bot", "message": "Error: $e"});
+    });
+  } finally {
+    setState(() {
+      _isThinking = false;
+    });
+    await _saveHistory();
+    _scrollToBottom();
+  }
 }
 
 
+  Future<void> _startListening() async {
+    if (!_isListening && await _speechToText.initialize()) {
+      setState(() => _isListening = true);
+      _speechToText.listen(onResult: (result) {
+        if (result.finalResult) {
+          sendMessage(result.recognizedWords);
+          setState(() => _isListening = false);
+        }
+      });
+    }
+  }
+
+  Future<void> _stopListening() async {
+    if (_isListening) {
+      await _speechToText.stop();
+      setState(() => _isListening = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _flutterTts.stop();
+    _speechToText.stop();
+    _connectivitySubscription.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chatbot Mejorado'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text('Chatbot con Voz'),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete),
-            onPressed: () {
-              setState(() {
-                _messages.clear();
-                _saveMessages();  // Limpiar mensajes guardados
-              });
-            },
+            onPressed: _clearChat,
           ),
         ],
       ),
@@ -185,20 +227,10 @@ Future<void> sendMessage(String message) async {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: scrollController,
               padding: const EdgeInsets.all(10.0),
-              itemCount: _messages.length + (_isThinking ? 1 : 0),
+              itemCount: _messages.length,
               itemBuilder: (context, index) {
-                if (_isThinking && index == _messages.length) {
-                  return const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: EdgeInsets.all(10.0),
-                      child: Text('Bot escribiendo',
-                          style: TextStyle(fontStyle: FontStyle.italic)),
-                    ),
-                  );
-                }
-
                 final message = _messages[index];
                 final isUserMessage = message['sender'] == 'user';
 
@@ -211,58 +243,46 @@ Future<void> sendMessage(String message) async {
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
                       color: isUserMessage
-                          ? Colors.deepPurple[300]
-                          : Color.fromARGB(255, 250, 161, 244),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(isUserMessage ? 15 : 0),
-                        topRight: const Radius.circular(15),
-                        bottomLeft: const Radius.circular(15),
-                        bottomRight: Radius.circular(isUserMessage ? 0 : 15),
-                      ),
+                          ? Colors.greenAccent
+                          : Colors.lightBlueAccent,
+                      borderRadius: BorderRadius.circular(15.0),
                     ),
                     child: Text(
                       message['message']!,
-                      style: TextStyle(
-                        color: isUserMessage ? Colors.white : Colors.black,
-                        fontSize: 16.0,
-                      ),
+                      style: const TextStyle(color: Colors.black),
                     ),
                   ),
                 );
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    decoration: InputDecoration(
-                      hintText: 'Escribir mensaje',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15.0),
-                      ),
-                    ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  decoration: const InputDecoration(
+                    hintText: 'Escribe un mensaje...',
+                    border: OutlineInputBorder(),
                   ),
                 ),
-                const SizedBox(width: 8.0),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  color: _isConnected ? Colors.greenAccent : Colors.grey,
-                  onPressed: _isConnected
-                      ? () {
-                          final text = _controller.text;
-                          if (_isMessageValid(text)) {
-                            sendMessage(text.trim());
-                          }
-                        }
-                      : null,
-                ),
-              ],
-            ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.mic),
+                onPressed: _isListening ? _stopListening : _startListening,
+                color: _isListening ? Colors.red : const Color.fromARGB(255, 26, 110, 28),
+              ),
+              IconButton(
+                icon: const Icon(Icons.send),
+                onPressed: () {
+                  final text = _controller.text.trim();
+                  if (text.isNotEmpty) {
+                    sendMessage(text);
+                  }
+                },
+              ),
+            ],
           ),
         ],
       ),
